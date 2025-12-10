@@ -18,11 +18,12 @@
 
         /* 탭바 */
       /* 탭바 */
+/* [수정됨] 탭바: 가로 길이를 본문(600px)에 맞추고 중앙 정렬 */
 .bottom-nav { 
     position: fixed; 
     bottom: 0; 
-    left: 50%; /* 중앙 정렬 기준점 */
-    transform: translateX(-50%); /* 중앙 정렬 */
+    left: 50%; /* 화면 중앙을 기준점으로 잡음 */
+    transform: translateX(-50%); /* 정확히 중앙으로 이동 */
     max-width: 600px; /* 본문과 동일한 너비 제한 */
     width: 100%; 
     height: 70px; 
@@ -612,59 +613,53 @@ async function addIngredient() {
 
     // (기존 function generateRecipe() 함수 전체를 이 코드로 덮어쓰세요)
 // (기존 function generateRecipe() 함수 전체를 이 코드로 덮어쓰세요)
+// [수정됨] 레시피 생성 및 결과 출력 함수 (깨짐 방지)
 async function generateRecipe() {
-    const userId = document.getElementById('my-user-id').value;
     document.getElementById('loading').style.display = 'block'; 
     document.getElementById('recipe-result').style.display = 'none';
     
     try {
-        const response = await fetch(`${API_URL}/ai/generate`, {
+        const res = await fetch(`${API_URL}/ai/generate`, {
             method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: userId })
+            headers: {'Content-Type':'application/json'}, 
+            body: JSON.stringify({userId: document.getElementById('my-user-id').value})
         });
-        const result = await response.json();
+        const json = await res.json();
         
-        document.getElementById('loading').style.display = 'none';
-
-        if (result.error) {
-            alert(result.error);
+        if(json.error) {
+            alert(json.error);
         } else {
-            // [핵심 수정]: Array.isArray() 체크 후 배열 데이터를 문자열로 변환합니다.
-            const materials = Array.isArray(result.materialsUsed) 
-                              ? result.materialsUsed.join(', ') // 배열이면 쉼표로 연결
-                              : result.materialsUsed; // 문자열이면 그대로 사용
-
-            const stepsHtml = Array.isArray(result.cookingSteps)
-                              ? result.cookingSteps.map(s => `<p>🍳 ${s}</p>`).join('') // 배열이면 <p> 태그로 감싸서 연결
-                              : `<p>🍳 ${result.cookingSteps}</p>`; // 배열이 아니면 그대로 사용
-
-            // 레시피 결과를 전역 변수에 저장 (FinishCooking 함수에서 사용)
-            window.currentRecipeName = result.recipeName;
-            window.currentRecipeIngredientsText = materials; 
+            currentRecipeName = json.recipeName;
+            document.getElementById('res-title').innerText = json.recipeName;
             
-            // 1. 결과 화면 표시
-            document.getElementById('res-title').innerText = result.recipeName;
-            document.getElementById('res-materials').innerHTML = materials; 
-            document.getElementById('res-steps').innerHTML = stepsHtml; // 조리 순서 HTML 삽입
-            
-            // 2. 팁과 버튼 영역 업데이트
-            document.getElementById('res-tip').innerHTML = result.tip;
-
-            // 3. 요리 시작 버튼 영역 표시 (새로 생성된 버튼 로직 포함)
-            const buttonContainer = document.getElementById('cooking-action-area');
-            if (buttonContainer) { // 만약 이전에 버튼이 있었다면 그대로 두고, 없다면 추가
-                 buttonContainer.innerHTML = `
-                    <button id="start-cooking-btn" onclick="startCooking()" style="background: #20c997; flex: 1;">요리 시작</button>
-                    <button id="finish-cooking-btn" class="hidden" onclick="finishCooking()" style="background: #fa5252; flex: 1;">요리 완료 (재료 차감)</button>
-                 `;
+            // 1. 재료 목록이 배열인지 확인하고 예쁘게 변환
+            let materialsText = "";
+            if (Array.isArray(json.materialsUsed)) {
+                // 배열 안에 문자열이 있는지 객체가 있는지 확인하여 처리
+                materialsText = json.materialsUsed.map(m => {
+                    return typeof m === 'object' ? JSON.stringify(m) : m;
+                }).join(', ');
+            } else {
+                materialsText = json.materialsUsed;
             }
+            document.getElementById('res-materials').innerText = materialsText;
 
+            // 2. 조리 순서도 배열인지 확인하고 HTML로 변환
+            let stepsHtml = "";
+            if (Array.isArray(json.cookingSteps)) {
+                stepsHtml = json.cookingSteps.map(s => `<p>🍳 ${s}</p>`).join('');
+            } else {
+                stepsHtml = `<p>🍳 ${json.cookingSteps}</p>`;
+            }
+            document.getElementById('res-steps').innerHTML = stepsHtml;
+            
             document.getElementById('recipe-result').style.display = 'block';
         }
-    } catch (e) {
-        alert("오류 발생");
-        document.getElementById('loading').style.display = 'none';
+    } catch(e) { 
+        console.error(e);
+        alert("오류가 발생했습니다."); 
+    } finally { 
+        document.getElementById('loading').style.display = 'none'; 
     }
 }
 // --- [추가] 글쓰기 모달 제어 기능 ---
